@@ -168,3 +168,5 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 }
 
 // todo: test reading from socket doesn't block accepting (parallel connections, may need to wait with N semaphore)
+// todo: implement and test closing listener first, to confirm closing done channel wraps stuff up
+//       need to consider draining pending responses, so can't just close connections?

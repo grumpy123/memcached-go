@@ -8,6 +8,7 @@ import (
 )
 
 type ConnectionHandler interface {
+	// New handles new connection, it should return only when the connection has been closed
 	New(conn net.Conn, done <-chan struct{})
 }
 
