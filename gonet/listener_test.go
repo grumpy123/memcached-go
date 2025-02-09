@@ -27,7 +27,7 @@ func TestListenerSuite(t *testing.T) {
 	suite.Run(t, new(ListenerSuite))
 }
 
-func (s *ListenerSuite) setupListener(hf HandlerFactory) *Listener {
+func (s *ListenerSuite) setupListener(hf ConnectionHandler) *Listener {
 	l := NewListener(0, hf)
 	err := l.Start(context.Background())
 	s.Require().Nil(err)
@@ -46,7 +46,7 @@ func (s *ListenerSuite) intEnv(env string, defaultValue int) int {
 	return i
 }
 
-type SingleConnectionTestHandlerFactory struct {
+type SingleConnectionTestHandler struct {
 	text          string
 	readErr       error
 	writeErr      error
@@ -54,8 +54,8 @@ type SingleConnectionTestHandlerFactory struct {
 	isDoneWriting sync.WaitGroup
 }
 
-func NewSingleConnectionTestHandlerFactory() *SingleConnectionTestHandlerFactory {
-	hf := &SingleConnectionTestHandlerFactory{
+func NewSingleConnectionTestHandler() *SingleConnectionTestHandler {
+	hf := &SingleConnectionTestHandler{
 		isDoneReading: sync.WaitGroup{},
 		isDoneWriting: sync.WaitGroup{},
 	}
@@ -64,24 +64,24 @@ func NewSingleConnectionTestHandlerFactory() *SingleConnectionTestHandlerFactory
 	return hf
 }
 
-func (hf *SingleConnectionTestHandlerFactory) New(c net.Conn, done <-chan struct{}) {
+func (sc *SingleConnectionTestHandler) New(c net.Conn, done <-chan struct{}) {
 	defer must(c.Close)
 
 	reader := bufio.NewReader(c)
 	writer := bufio.NewWriter(c)
-	hf.text, hf.readErr = reader.ReadString('\n')
-	hf.isDoneReading.Done()
-	_, hf.writeErr = writer.WriteString("world\n")
-	if hf.writeErr == nil {
-		hf.writeErr = writer.Flush()
+	sc.text, sc.readErr = reader.ReadString('\n')
+	sc.isDoneReading.Done()
+	_, sc.writeErr = writer.WriteString("world\n")
+	if sc.writeErr == nil {
+		sc.writeErr = writer.Flush()
 	}
-	hf.isDoneWriting.Done()
+	sc.isDoneWriting.Done()
 
 	<-done
 }
 
 func (s *ListenerSuite) TestSingleConnection() {
-	hf := NewSingleConnectionTestHandlerFactory()
+	hf := NewSingleConnectionTestHandler()
 	thf := WithTracking(hf)
 	l := s.setupListener(thf)
 
@@ -108,13 +108,13 @@ func (s *ListenerSuite) TestSingleConnection() {
 	<-thf.Done()
 }
 
-type ConcurrentConnectionsTestHandlerFactory struct{}
+type ConcurrentConnectionsTestHandler struct{}
 
-func (hf *ConcurrentConnectionsTestHandlerFactory) New(c net.Conn, done <-chan struct{}) {
-	defer must(c.Close)
+func (cc *ConcurrentConnectionsTestHandler) New(conn net.Conn, done <-chan struct{}) {
+	defer must(conn.Close)
 
-	reader := bufio.NewReader(c)
-	writer := bufio.NewWriter(c)
+	reader := bufio.NewReader(conn)
+	writer := bufio.NewWriter(conn)
 	for {
 		readText, err := reader.ReadString('\n')
 		if err != nil {
@@ -132,7 +132,7 @@ func (hf *ConcurrentConnectionsTestHandlerFactory) New(c net.Conn, done <-chan s
 }
 
 func (s *ListenerSuite) TestConcurrentConnections() {
-	hf := &ConcurrentConnectionsTestHandlerFactory{}
+	hf := &ConcurrentConnectionsTestHandler{}
 	thf := WithTracking(hf)
 	l := s.setupListener(thf)
 

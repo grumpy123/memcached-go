@@ -7,23 +7,23 @@ import (
 	"sync"
 )
 
-type HandlerFactory interface {
-	New(c net.Conn, done <-chan struct{})
+type ConnectionHandler interface {
+	New(conn net.Conn, done <-chan struct{})
 }
 
 type Listener struct {
-	handler HandlerFactory
+	handler ConnectionHandler
 	addr    string
 
 	listener net.Listener
 	done     chan struct{}
 }
 
-func NewListener(port int, handler HandlerFactory) *Listener {
+func NewListener(port int, handler ConnectionHandler) *Listener {
 	return NewListenerForAddr(fmt.Sprintf(":%d", port), handler)
 }
 
-func NewListenerForAddr(addr string, handler HandlerFactory) *Listener {
+func NewListenerForAddr(addr string, handler ConnectionHandler) *Listener {
 	l := &Listener{
 		handler: handler,
 		addr:    addr,
@@ -64,34 +64,34 @@ func (l *Listener) Close() error {
 	return l.listener.Close()
 }
 
-type TrackingHandlerFactory struct {
-	inner   HandlerFactory
+type TrackingConnectionHandler struct {
+	inner   ConnectionHandler
 	tracker sync.WaitGroup
 }
 
-func WithTracking(handler HandlerFactory) *TrackingHandlerFactory {
-	return &TrackingHandlerFactory{
+func WithTracking(handler ConnectionHandler) *TrackingConnectionHandler {
+	return &TrackingConnectionHandler{
 		inner:   handler,
 		tracker: sync.WaitGroup{},
 	}
 }
 
-func (hf *TrackingHandlerFactory) New(c net.Conn, done <-chan struct{}) {
-	hf.tracker.Add(1)
-	hf.inner.New(c, done)
-	hf.tracker.Done()
+func (tc *TrackingConnectionHandler) New(conn net.Conn, done <-chan struct{}) {
+	tc.tracker.Add(1)
+	tc.inner.New(conn, done)
+	tc.tracker.Done()
 }
 
-func (hf *TrackingHandlerFactory) Wait() {
-	hf.tracker.Wait()
+func (tc *TrackingConnectionHandler) Wait() {
+	tc.tracker.Wait()
 }
 
-func (hf *TrackingHandlerFactory) Done() <-chan struct{} {
-	ch := make(chan struct{})
+func (tc *TrackingConnectionHandler) Done() <-chan struct{} {
+	done := make(chan struct{})
 	go func() {
-		hf.tracker.Wait()
-		close(ch)
+		tc.tracker.Wait()
+		close(done)
 	}()
 
-	return ch
+	return done
 }
