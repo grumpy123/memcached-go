@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 )
 
 type HandlerFactory interface {
@@ -50,7 +51,7 @@ func (l *Listener) listen() {
 		if err != nil {
 			return
 		}
-		l.handler.New(conn, l.done)
+		go l.handler.New(conn, l.done)
 	}
 }
 
@@ -61,4 +62,36 @@ func (l *Listener) Address() net.Addr {
 func (l *Listener) Close() error {
 	close(l.done)
 	return l.listener.Close()
+}
+
+type TrackingHandlerFactory struct {
+	inner   HandlerFactory
+	tracker sync.WaitGroup
+}
+
+func WithTracking(handler HandlerFactory) *TrackingHandlerFactory {
+	return &TrackingHandlerFactory{
+		inner:   handler,
+		tracker: sync.WaitGroup{},
+	}
+}
+
+func (hf *TrackingHandlerFactory) New(c net.Conn, done <-chan struct{}) {
+	hf.tracker.Add(1)
+	hf.inner.New(c, done)
+	hf.tracker.Done()
+}
+
+func (hf *TrackingHandlerFactory) Wait() {
+	hf.tracker.Wait()
+}
+
+func (hf *TrackingHandlerFactory) Done() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		hf.tracker.Wait()
+		close(ch)
+	}()
+
+	return ch
 }
