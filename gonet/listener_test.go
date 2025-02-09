@@ -3,50 +3,20 @@ package gonet
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
 
-type TestHandlerFactory struct {
-	text          string
-	readErr       error
-	writeErr      error
-	isDoneReading sync.WaitGroup
-	isDoneWriting sync.WaitGroup
-}
-
-func NewTestHandlerFactory(expectedClients int) *TestHandlerFactory {
-	hf := &TestHandlerFactory{
-		isDoneReading: sync.WaitGroup{},
-		isDoneWriting: sync.WaitGroup{},
-	}
-	hf.isDoneReading.Add(expectedClients)
-	hf.isDoneWriting.Add(expectedClients)
-	return hf
-}
-
-func must(err error) {
-	if err != nil {
+func must(f func() error) {
+	if err := f(); err != nil {
 		panic(err)
 	}
-}
-
-func (hf *TestHandlerFactory) New(c net.Conn, done <-chan struct{}) {
-	reader := bufio.NewReader(c)
-	writer := bufio.NewWriter(c)
-	hf.text, hf.readErr = reader.ReadString('\n')
-	hf.isDoneReading.Done()
-	_, hf.writeErr = writer.WriteString("world\n")
-	if hf.writeErr == nil {
-		hf.writeErr = writer.Flush()
-	}
-	hf.isDoneWriting.Done()
-
-	<-done
-	must(c.Close())
 }
 
 type ListenerSuite struct {
@@ -65,8 +35,53 @@ func (s *ListenerSuite) setupListener(hf HandlerFactory) *Listener {
 	return l
 }
 
-func (s *ListenerSuite) TestConnectionOpenAndClose() {
-	hf := NewTestHandlerFactory(1)
+func (s *ListenerSuite) intEnv(env string, defaultValue int) int {
+	strValue := os.Getenv(env)
+	if strValue == "" {
+		return defaultValue
+	}
+
+	i, err := strconv.Atoi(strValue)
+	s.Require().Nil(err)
+	return i
+}
+
+type SingleConnectionTestHandlerFactory struct {
+	text          string
+	readErr       error
+	writeErr      error
+	isDoneReading sync.WaitGroup
+	isDoneWriting sync.WaitGroup
+}
+
+func NewSingleConnectionTestHandlerFactory() *SingleConnectionTestHandlerFactory {
+	hf := &SingleConnectionTestHandlerFactory{
+		isDoneReading: sync.WaitGroup{},
+		isDoneWriting: sync.WaitGroup{},
+	}
+	hf.isDoneReading.Add(1)
+	hf.isDoneWriting.Add(1)
+	return hf
+}
+
+func (hf *SingleConnectionTestHandlerFactory) New(c net.Conn, done <-chan struct{}) {
+	defer must(c.Close)
+
+	reader := bufio.NewReader(c)
+	writer := bufio.NewWriter(c)
+	hf.text, hf.readErr = reader.ReadString('\n')
+	hf.isDoneReading.Done()
+	_, hf.writeErr = writer.WriteString("world\n")
+	if hf.writeErr == nil {
+		hf.writeErr = writer.Flush()
+	}
+	hf.isDoneWriting.Done()
+
+	<-done
+}
+
+func (s *ListenerSuite) TestSingleConnection() {
+	hf := NewSingleConnectionTestHandlerFactory()
 	thf := WithTracking(hf)
 	l := s.setupListener(thf)
 
@@ -93,5 +108,63 @@ func (s *ListenerSuite) TestConnectionOpenAndClose() {
 	<-thf.Done()
 }
 
-// todo: stress test connection creation and destruction
+type ConcurrentConnectionsTestHandlerFactory struct{}
+
+func (hf *ConcurrentConnectionsTestHandlerFactory) New(c net.Conn, done <-chan struct{}) {
+	defer must(c.Close)
+
+	reader := bufio.NewReader(c)
+	writer := bufio.NewWriter(c)
+	for {
+		readText, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		_, err = writer.WriteString(fmt.Sprintf("same to you: %s", readText))
+		if err != nil {
+			return
+		}
+		err = writer.Flush()
+		if err != nil {
+			return
+		}
+	}
+}
+
+func (s *ListenerSuite) TestConcurrentConnections() {
+	hf := &ConcurrentConnectionsTestHandlerFactory{}
+	thf := WithTracking(hf)
+	l := s.setupListener(thf)
+
+	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 10)
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+
+	clientTest := func(worker int) {
+		conn, err := net.Dial("tcp", l.Address().String())
+		s.Require().Nil(err)
+
+		for i := 1; i <= iterations; i++ {
+			text := fmt.Sprintf("hello %d from worker %d\n", i, worker)
+			_, err = conn.Write([]byte(text))
+			s.Require().Nil(err)
+			reader := bufio.NewReader(conn)
+			resText, err := reader.ReadString('\n')
+			s.Require().Nil(err)
+			s.Assert().Equal("same to you: "+text, resText)
+		}
+
+		s.Require().Nil(conn.Close())
+		wg.Done()
+	}
+	for i := 1; i <= workers; i++ {
+		go clientTest(1)
+	}
+
+	wg.Wait()
+	s.Require().Nil(l.Close())
+	<-thf.Done()
+}
+
 // todo: test reading from socket doesn't block accepting (parallel connections, may need to wait with N semaphore)

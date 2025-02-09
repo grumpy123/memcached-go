@@ -6,7 +6,7 @@ test:
 
 .PHONY: stress-test
 stress-test:
-	go test $(TEST_OPTS) --count=50 ./...
+	TEST_CONCURRENT_WORKERS=20 TEST_CONCURRENT_ITERATIONS=100 go test $(TEST_OPTS) --count=50 ./...
 
 .PHONY: fmt
 fmt:
