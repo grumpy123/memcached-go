@@ -81,9 +81,9 @@ func (sc *SingleConnectionTestHandler) New(c net.Conn, done <-chan struct{}) {
 }
 
 func (s *ListenerSuite) TestSingleConnection() {
-	hf := NewSingleConnectionTestHandler()
-	thf := WithTracking(hf)
-	l := s.setupListener(thf)
+	h := NewSingleConnectionTestHandler()
+	th := WithTracking(h)
+	l := s.setupListener(th)
 
 	conn, err := net.Dial("tcp", l.Address().String())
 	s.Require().Nil(err)
@@ -91,21 +91,21 @@ func (s *ListenerSuite) TestSingleConnection() {
 	_, err = conn.Write([]byte("hello\n"))
 	s.Require().Nil(err)
 
-	hf.isDoneReading.Wait()
-	s.Assert().Nil(hf.readErr)
-	s.Assert().Equal("hello\n", hf.text)
+	h.isDoneReading.Wait()
+	s.Assert().Nil(h.readErr)
+	s.Assert().Equal("hello\n", h.text)
 
-	hf.isDoneWriting.Wait()
+	h.isDoneWriting.Wait()
 	reader := bufio.NewReader(conn)
 	resText, err := reader.ReadString('\n')
 	s.Require().Nil(err)
 	s.Assert().Equal("world\n", resText)
-	s.Assert().Nil(hf.writeErr)
+	s.Assert().Nil(h.writeErr)
 
 	s.Require().Nil(conn.Close())
 	s.Require().Nil(l.Close())
 
-	<-thf.Done()
+	<-th.Done()
 }
 
 type ConcurrentConnectionsTestHandler struct{}
@@ -132,9 +132,9 @@ func (cc *ConcurrentConnectionsTestHandler) New(conn net.Conn, done <-chan struc
 }
 
 func (s *ListenerSuite) TestConcurrentConnections() {
-	hf := &ConcurrentConnectionsTestHandler{}
-	thf := WithTracking(hf)
-	l := s.setupListener(thf)
+	h := &ConcurrentConnectionsTestHandler{}
+	th := WithTracking(h)
+	l := s.setupListener(th)
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
 	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 10)
@@ -164,7 +164,7 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 
 	wg.Wait()
 	s.Require().Nil(l.Close())
-	<-thf.Done()
+	<-th.Done()
 }
 
 // todo: test reading from socket doesn't block accepting (parallel connections, may need to wait with N semaphore)
