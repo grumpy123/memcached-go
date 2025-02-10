@@ -54,32 +54,49 @@ func (s *Server) requestLoop() {
 			return
 		}
 		pending := &PendingRequest{request: request, completed: make(chan struct{})}
-		s.requests <- pending
 		go s.handle(pending)
+		s.requests <- pending
 	}
 }
 
 func (s *Server) handle(pending *PendingRequest) {
+	// todo: if we ever use this in production, we'd want to handle panics and have a timeout here
 	pending.request.Handle()
 	close(pending.completed)
 }
 
 func (s *Server) responseLoop() {
 	writer := bufio.NewWriter(s.conn)
-	for pending := range s.requests {
+	select {
+	case pending := <-s.requests:
 		<-pending.completed
 		err := pending.request.WriteResponse(writer)
 		if err != nil {
-			break
+			return
 		}
 		err = writer.Flush()
 		if err != nil {
-			break
+			return
 		}
-	}
-
-	for _ = range s.requests {
-		// discarding any remaining requests
+	case <-s.done:
+		// drain ready work and exit
+		for {
+			select {
+			case pending := <-s.requests:
+				<-pending.completed // todo: have to be careful here, add a timeout to not block forever
+				err := pending.request.WriteResponse(writer)
+				if err != nil {
+					return
+				}
+				err = writer.Flush()
+				if err != nil {
+					return
+				}
+			default:
+				// No more ready work
+				return
+			}
+		}
 	}
 }
 

@@ -77,6 +77,5 @@ func (s *ServerSuite) TestServer() {
 	s.Assert().Equal("hello\n", resText)
 
 	s.Require().Nil(l.Close())
-	// todo: when server handles done correctly
-	//<-th.Done()
+	<-th.Done()
 }
