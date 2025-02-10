@@ -2,48 +2,20 @@ package gonet
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
 
-func must(f func() error) {
-	if err := f(); err != nil {
-		panic(err)
-	}
-}
-
 type ListenerSuite struct {
-	suite.Suite
+	BaseSuite
 }
 
 func TestListenerSuite(t *testing.T) {
 	suite.Run(t, new(ListenerSuite))
-}
-
-func (s *ListenerSuite) setupListener(hf ConnectionHandler) *Listener {
-	l := NewListener(0, hf)
-	err := l.Start(context.Background())
-	s.Require().Nil(err)
-
-	return l
-}
-
-func (s *ListenerSuite) intEnv(env string, defaultValue int) int {
-	strValue := os.Getenv(env)
-	if strValue == "" {
-		return defaultValue
-	}
-
-	i, err := strconv.Atoi(strValue)
-	s.Require().Nil(err)
-	return i
 }
 
 type SingleConnectionTestHandler struct {
@@ -159,7 +131,7 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 		wg.Done()
 	}
 	for i := 1; i <= workers; i++ {
-		go clientTest(1)
+		go clientTest(i)
 	}
 
 	wg.Wait()

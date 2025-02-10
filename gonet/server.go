@@ -67,34 +67,42 @@ func (s *Server) handle(pending *PendingRequest) {
 
 func (s *Server) responseLoop() {
 	writer := bufio.NewWriter(s.conn)
-	select {
-	case pending := <-s.requests:
-		<-pending.completed
-		err := pending.request.WriteResponse(writer)
-		if err != nil {
-			return
-		}
-		err = writer.Flush()
-		if err != nil {
-			return
-		}
-	case <-s.done:
-		// drain ready work and exit
-		for {
-			select {
-			case pending := <-s.requests:
-				<-pending.completed // todo: have to be careful here, add a timeout to not block forever
-				err := pending.request.WriteResponse(writer)
-				if err != nil {
-					return
-				}
-				err = writer.Flush()
-				if err != nil {
-					return
-				}
-			default:
-				// No more ready work
+	for {
+		select {
+		case pending, ok := <-s.requests:
+			if !ok {
 				return
+			}
+			<-pending.completed
+			err := pending.request.WriteResponse(writer)
+			if err != nil {
+				return
+			}
+			err = writer.Flush()
+			if err != nil {
+				return
+			}
+		case <-s.done:
+			// drain ready work and exit
+			for {
+				select {
+				case pending, ok := <-s.requests:
+					if !ok {
+						return
+					}
+					<-pending.completed // todo: have to be careful here, add a timeout to not block forever
+					err := pending.request.WriteResponse(writer)
+					if err != nil {
+						return
+					}
+					err = writer.Flush()
+					if err != nil {
+						return
+					}
+				default:
+					// No more ready work
+					return
+				}
 			}
 		}
 	}

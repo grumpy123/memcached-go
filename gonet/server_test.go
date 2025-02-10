@@ -2,28 +2,21 @@ package gonet
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"github.com/stretchr/testify/suite"
 	"net"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
 
 type ServerSuite struct {
-	suite.Suite
+	BaseSuite
 }
 
 func TestServerSuite(t *testing.T) {
 	suite.Run(t, new(ServerSuite))
-}
-
-func (s *ServerSuite) setupListener(hf ConnectionHandler) *Listener {
-	l := NewListener(0, hf)
-	err := l.Start(context.Background())
-	s.Require().Nil(err)
-
-	return l
 }
 
 func (t *TestRequest) Handle() {
@@ -71,11 +64,59 @@ func (s *ServerSuite) TestServer() {
 	resTS, err := reader.ReadString('\n')
 	s.Require().Nil(err)
 	s.Assert().NotEmpty(resTS)
+	ts, err := strconv.ParseInt(resTS, 10, 64)
+	s.Assert().GreaterOrEqual(time.Now().Add(-time.Minute).UnixNano(), ts)
+	s.Assert().GreaterOrEqual(time.Now().UnixNano(), ts)
 
 	resText, err := reader.ReadString('\n')
 	s.Require().Nil(err)
 	s.Assert().Equal("hello\n", resText)
 
+	s.Require().Nil(l.Close())
+	s.Require().Nil(conn.Close())
+	<-th.Done()
+}
+
+func (s *ServerSuite) TestServerConcurrency() {
+	h := &TestRequestHandler{}
+	th := WithTracking(NewServerFactory(h))
+	l := s.setupListener(th)
+
+	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 10)
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+
+	clientTest := func(worker int) {
+		conn, err := net.Dial("tcp", l.Address().String())
+		s.Require().Nil(err)
+		reader := bufio.NewReader(conn)
+
+		for i := 1; i <= iterations; i++ {
+			text := fmt.Sprintf("hello %d from worker %d\n", i, worker)
+			_, err = conn.Write([]byte(text))
+			s.Require().Nil(err)
+
+			resTS, err := reader.ReadString('\n')
+			s.Require().Nil(err)
+			s.Assert().NotEmpty(resTS)
+			ts, err := strconv.ParseInt(resTS, 10, 64)
+			s.Assert().GreaterOrEqual(time.Now().Add(-time.Minute).UnixNano(), ts)
+			s.Assert().GreaterOrEqual(time.Now().UnixNano(), ts)
+
+			resText, err := reader.ReadString('\n')
+			s.Require().Nil(err)
+			s.Assert().Equal(text, resText)
+		}
+
+		s.Require().Nil(conn.Close())
+		wg.Done()
+	}
+	for i := 1; i <= workers; i++ {
+		go clientTest(i)
+	}
+
+	wg.Wait()
 	s.Require().Nil(l.Close())
 	<-th.Done()
 }

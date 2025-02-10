@@ -21,4 +21,4 @@ lint:
 	go vet ./...
 
 .PHONY: pr
-pr: test lint fmt
+pr: stress-test lint fmt
