@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,19 +18,6 @@ type ServerSuite struct {
 
 func TestServerSuite(t *testing.T) {
 	suite.Run(t, new(ServerSuite))
-}
-
-func (t *TestRequest) Handle() {
-	t.ts = time.Now()
-	// todo: inject things here
-}
-
-func (t *TestRequest) WriteResponse(writer *bufio.Writer) error {
-	_, err := writer.WriteString(fmt.Sprintf("%d\n%s", t.ts.UnixNano(), t.input))
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 type TestRequestHandler struct{}
@@ -45,6 +33,19 @@ func (t *TestRequestHandler) ReadRequest(reader *bufio.Reader) (Request, error) 
 		return nil, err
 	}
 	return &TestRequest{input: input}, nil
+}
+
+func (t *TestRequest) Handle() {
+	t.ts = time.Now()
+	// todo: inject things here
+}
+
+func (t *TestRequest) WriteResponse(writer *bufio.Writer) error {
+	_, err := writer.WriteString(fmt.Sprintf("%d\n%s", t.ts.UnixMicro(), t.input))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *ServerSuite) TestServer() {
@@ -64,9 +65,10 @@ func (s *ServerSuite) TestServer() {
 	resTS, err := reader.ReadString('\n')
 	s.Require().Nil(err)
 	s.Assert().NotEmpty(resTS)
-	ts, err := strconv.ParseInt(resTS, 10, 64)
-	s.Assert().GreaterOrEqual(time.Now().Add(-time.Minute).UnixNano(), ts)
-	s.Assert().GreaterOrEqual(time.Now().UnixNano(), ts)
+	ts, err := strconv.ParseInt(strings.TrimSpace(resTS), 10, 64)
+	s.Require().Nil(err)
+	s.Assert().LessOrEqual(time.Now().Add(-time.Minute).UnixMicro(), ts)
+	s.Assert().GreaterOrEqual(time.Now().UnixMicro(), ts)
 
 	resText, err := reader.ReadString('\n')
 	s.Require().Nil(err)

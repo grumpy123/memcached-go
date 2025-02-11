@@ -19,10 +19,10 @@ type Server struct {
 	conn    net.Conn
 	done    <-chan struct{}
 
-	requests chan *PendingRequest
+	requests chan *pendingRequest
 }
 
-type PendingRequest struct {
+type pendingRequest struct {
 	request   Request
 	completed chan struct{}
 }
@@ -33,7 +33,7 @@ func NewServer(handler RequestHandler, conn net.Conn, done <-chan struct{}) *Ser
 		conn:    conn,
 		done:    done,
 
-		requests: make(chan *PendingRequest),
+		requests: make(chan *pendingRequest),
 	}
 	return s
 }
@@ -41,7 +41,6 @@ func NewServer(handler RequestHandler, conn net.Conn, done <-chan struct{}) *Ser
 func (s *Server) Run() {
 	go s.requestLoop()
 	s.responseLoop()
-	s.close()
 }
 
 func (s *Server) requestLoop() {
@@ -53,19 +52,21 @@ func (s *Server) requestLoop() {
 		if err != nil {
 			return
 		}
-		pending := &PendingRequest{request: request, completed: make(chan struct{})}
+		pending := &pendingRequest{request: request, completed: make(chan struct{})}
 		go s.handle(pending)
 		s.requests <- pending
 	}
 }
 
-func (s *Server) handle(pending *PendingRequest) {
+func (s *Server) handle(pending *pendingRequest) {
 	// todo: if we ever use this in production, we'd want to handle panics and have a timeout here
 	pending.request.Handle()
 	close(pending.completed)
 }
 
 func (s *Server) responseLoop() {
+	defer s.close()
+
 	writer := bufio.NewWriter(s.conn)
 	for {
 		select {
@@ -116,11 +117,6 @@ func (s *Server) responseLoop() {
 func (s *Server) close() {
 	// todo: log errors
 	_ = s.conn.Close()
-
-	// discarding any remaining requests and waiting for the requestLoop to close the channel
-	for _ = range s.requests {
-	}
-
 	s.conn = nil
 }
 
