@@ -3,9 +3,12 @@ package gonet
 import (
 	"bufio"
 	"context"
+	"errors"
+	"fmt"
 	"github.com/stretchr/testify/suite"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -69,4 +72,97 @@ func (s *ConnectionSuite) TestConnection() {
 
 	s.Require().Nil(l.Close())
 	<-th.Done()
+}
+
+func (s *ConnectionSuite) TestConnectionConcurrency() {
+	h := &TestRequestHandler{}
+	th := WithTracking(NewServerFactory(h))
+
+	l := s.setupListener(th)
+
+	conn, err := NewConnection(l.Address().String())
+	s.Require().Nil(err)
+
+	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
+	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+
+	clientTest := func(worker int) {
+		for i := 1; i <= iterations; i++ {
+			text := fmt.Sprintf("hello %d from worker %d", i, worker)
+			msg := &TestMessage{inText: text}
+			err := conn.Call(context.Background(), msg)
+			s.Assert().Nil(err)
+
+			s.Assert().LessOrEqual(time.Now().Add(-time.Minute), msg.outTS)
+			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
+			s.Assert().Equal(text, msg.outText)
+		}
+		wg.Done()
+	}
+	for i := 1; i <= workers; i++ {
+		go clientTest(i)
+	}
+	wg.Wait()
+	conn.Close()
+
+	<-th.Done()
+	s.Require().Nil(l.Close())
+}
+
+func (s *ConnectionSuite) TestConnectionClose() {
+	h := &TestRequestHandler{}
+	th := WithTracking(NewServerFactory(h))
+
+	l := s.setupListener(th)
+
+	conn, err := NewConnection(l.Address().String())
+	s.Require().Nil(err)
+
+	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+
+	clientTest := func(worker int) {
+		for i := 1; i <= iterations; i++ {
+			text := fmt.Sprintf("hello %d from worker %d", i, worker)
+			msg := &TestMessage{inText: text}
+			err := conn.Call(context.Background(), msg)
+			s.Assert().Nil(err)
+
+			s.Assert().LessOrEqual(time.Now().Add(-time.Minute), msg.outTS)
+			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
+			s.Assert().Equal(text, msg.outText)
+		}
+		wg.Done()
+	}
+	for i := 1; i <= workers; i++ {
+		go clientTest(i)
+	}
+	wg.Wait()
+
+	s.Require().Nil(l.Close())
+	// Wait until the server loops completes and closes the connection
+	<-th.Done()
+
+	// todo: switch to Send when it's implemented
+	err = conn.Call(context.Background(), &TestMessage{inText: "Expected to fail gracefully"})
+	s.Require().Error(err)
+	s.Assert().ErrorContains(err, "receiving error")
+	err = conn.Call(context.Background(), &TestMessage{inText: "Expected to fail gracefully too"})
+	s.Require().Error(err)
+	if !errors.Is(err, ErrConnClosed) {
+		s.Assert().ErrorContains(err, "sending error")
+		err = conn.Call(context.Background(), &TestMessage{inText: "Expected to fail gracefully as well"})
+	}
+	s.Require().Error(err)
+	s.Assert().ErrorIs(err, ErrConnClosed)
+	for i := 0; i < 10; i++ {
+		err = conn.Call(context.Background(), &TestMessage{inText: "Expected to fail gracefully, forever and always"})
+		s.Require().Error(err)
+		s.Assert().ErrorIs(err, ErrConnClosed)
+	}
+	conn.Close()
 }

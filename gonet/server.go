@@ -33,7 +33,7 @@ func NewServer(handler RequestHandler, conn net.Conn, done <-chan struct{}) *Ser
 		conn:    conn,
 		done:    done,
 
-		requests: make(chan *pendingRequest),
+		requests: make(chan *pendingRequest, 1024), // todo: parameter
 	}
 	return s
 }

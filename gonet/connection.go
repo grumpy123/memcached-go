@@ -71,16 +71,23 @@ func (c *Connection) requestLoop() {
 
 	w := bufio.NewWriter(c.conn)
 	for req := range c.requests {
+		if w == nil {
+			req.err = ErrConnClosed
+			close(req.completed)
+			continue
+		}
+
 		err := req.msg.WriteRequest(w)
 		if err == nil {
 			err = w.Flush()
 		}
 
 		if err != nil {
+			// stop writing
+			w = nil
 			req.err = fmt.Errorf("sending error: %w", err)
 			close(req.completed)
-			// todo: drain remaining requests and fulfill with errors
-			return
+			continue
 		}
 
 		c.pending <- req
@@ -91,13 +98,18 @@ func (c *Connection) responseLoop() {
 	defer c.closeConnection()
 
 	r := bufio.NewReader(c.conn)
-	var err error
 	for resp := range c.pending {
-		if err == nil {
-			err = resp.msg.ReadResponse(r)
+		if r == nil {
+			resp.err = ErrConnClosed
+			close(resp.completed)
+			continue
 		}
+
+		err := resp.msg.ReadResponse(r)
 		if err != nil {
 			resp.err = fmt.Errorf("receiving error: %w", err)
+			// stop reading
+			r = nil
 		}
 		// assign the error to the response here?
 		close(resp.completed)
