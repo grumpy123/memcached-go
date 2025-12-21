@@ -24,7 +24,7 @@ func (s *ClientSuite) TestClient() {
 
 	l := s.setupListener(th)
 
-	cli, err := NewClient(l.Address().String(), 1, 1)
+	cli, err := NewClient(l.Address().String(), 0, 1)
 	s.Require().Nil(err)
 
 	sendTime := time.Now()
@@ -40,13 +40,13 @@ func (s *ClientSuite) TestClient() {
 	<-th.Done()
 }
 
-func (s *ClientSuite) TestConnectionConcurrency() {
+func (s *ClientSuite) TestClientConcurrency() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
 	l := s.setupListener(th)
 
-	cli, err := NewClient(l.Address().String(), 5, 5)
+	cli, err := NewClient(l.Address().String(), 2, 7)
 	s.Require().Nil(err)
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
@@ -57,6 +57,28 @@ func (s *ClientSuite) TestConnectionConcurrency() {
 
 	<-th.Done()
 	s.Require().Nil(l.Close())
+}
+
+func (s *ClientSuite) TestClientClose() {
+	h := &TestRequestHandler{}
+	th := WithTracking(NewServerFactory(h))
+
+	l := s.setupListener(th)
+
+	cli, err := NewClient(l.Address().String(), 1, 5)
+	s.Require().Nil(err)
+
+	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
+	s.testClients(cli, workers, iterations)
+
+	s.Require().Nil(l.Close())
+	// Wait until the server loops completes and closes the connection
+	<-th.Done()
+
+	// todo: Need to define the expected behavior on empty pool first, fast failure or timeout, and then test it here
+
+	cli.Close()
 }
 
 func (s *ClientSuite) testClients(cli *Client, workers int, iterations int) {

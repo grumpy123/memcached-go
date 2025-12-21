@@ -19,7 +19,8 @@ type PendingMessage struct {
 }
 
 type Connection struct {
-	conn net.Conn
+	conn   net.Conn
+	isOpen bool
 
 	requests chan *PendingMessage
 	pending  chan *PendingMessage
@@ -32,7 +33,8 @@ func NewConnection(server string) (*Connection, error) {
 	}
 
 	c := &Connection{
-		conn: conn,
+		conn:   conn,
+		isOpen: true,
 
 		requests: make(chan *PendingMessage),       // no buffer, just synchronize writers and connection
 		pending:  make(chan *PendingMessage, 1024), // todo: buffer here, in the future make it expand dynamically
@@ -42,7 +44,15 @@ func NewConnection(server string) (*Connection, error) {
 	return c, nil
 }
 
+func (c *Connection) IsOpen() bool {
+	return c.isOpen
+}
+
 func (c *Connection) Send(ctx context.Context, msg Message) (*PendingMessage, error) {
+	if !c.isOpen {
+		return nil, ErrConnClosed
+	}
+
 	req := &PendingMessage{msg: msg, completed: make(chan struct{})}
 	select {
 	case c.requests <- req:
@@ -71,6 +81,7 @@ func (c *Connection) Call(ctx context.Context, msg Message) error {
 
 // Close closes the client connection. Calls to Send or Call after Close will panic.
 func (c *Connection) Close() {
+	c.isOpen = false
 	close(c.requests)
 }
 
@@ -93,6 +104,7 @@ func (c *Connection) requestLoop() {
 		if err != nil {
 			// stop writing
 			w = nil
+			c.isOpen = false
 			req.err = fmt.Errorf("sending error: %w", err)
 			close(req.completed)
 			continue
@@ -118,8 +130,8 @@ func (c *Connection) responseLoop() {
 			resp.err = fmt.Errorf("receiving error: %w", err)
 			// stop reading
 			r = nil
+			c.isOpen = false
 		}
-		// assign the error to the response here?
 		close(resp.completed)
 	}
 }
