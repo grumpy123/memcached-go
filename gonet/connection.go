@@ -12,7 +12,7 @@ type Message interface {
 	ReadResponse(r *bufio.Reader) error
 }
 
-type pendingMessage struct {
+type PendingMessage struct {
 	msg       Message
 	err       error
 	completed chan struct{}
@@ -21,8 +21,8 @@ type pendingMessage struct {
 type Connection struct {
 	conn net.Conn
 
-	requests chan *pendingMessage
-	pending  chan *pendingMessage
+	requests chan *PendingMessage
+	pending  chan *PendingMessage
 }
 
 func NewConnection(server string) (*Connection, error) {
@@ -34,22 +34,30 @@ func NewConnection(server string) (*Connection, error) {
 	c := &Connection{
 		conn: conn,
 
-		requests: make(chan *pendingMessage),
-		pending:  make(chan *pendingMessage),
+		requests: make(chan *PendingMessage),       // no buffer, just synchronize writers and connection
+		pending:  make(chan *PendingMessage, 1024), // todo: buffer here, in the future make it expand dynamically
 	}
 	go c.requestLoop()
 	go c.responseLoop()
 	return c, nil
 }
 
-func (c *Connection) Call(ctx context.Context, msg Message) error {
-	req := &pendingMessage{msg: msg, completed: make(chan struct{})}
+func (c *Connection) Send(ctx context.Context, msg Message) (*PendingMessage, error) {
+	req := &PendingMessage{msg: msg, completed: make(chan struct{})}
 	select {
 	case c.requests <- req:
+		return req, nil
 	case <-ctx.Done():
 		// The message was never queued, we have to close the completed channel to avoid leaking it
 		close(req.completed)
-		return ctx.Err()
+		return nil, ctx.Err()
+	}
+}
+
+func (c *Connection) Call(ctx context.Context, msg Message) error {
+	req, err := c.Send(ctx, msg)
+	if err != nil {
+		return err
 	}
 
 	select {
@@ -61,7 +69,7 @@ func (c *Connection) Call(ctx context.Context, msg Message) error {
 	return req.err
 }
 
-// Close closes the client connection. Calls to Call after Close will panic.
+// Close closes the client connection. Calls to Send or Call after Close will panic.
 func (c *Connection) Close() {
 	close(c.requests)
 }

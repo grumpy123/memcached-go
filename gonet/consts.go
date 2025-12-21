@@ -3,5 +3,5 @@ package gonet
 import "errors"
 
 var (
-	ErrConnClosed = errors.New("conn closed")
+	ErrConnClosed = errors.New("connection closed")
 )

@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/suite"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type ConnectionSuite struct {
@@ -62,11 +63,12 @@ func (s *ConnectionSuite) TestConnection() {
 	conn, err := NewConnection(l.Address().String())
 	s.Require().Nil(err)
 
+	sendTime := time.Now()
 	msg := &TestMessage{inText: "hello world"}
 	err = conn.Call(context.Background(), msg)
 	s.Require().Nil(err)
 
-	s.Assert().LessOrEqual(time.Now().Add(-time.Minute), msg.outTS)
+	s.Assert().LessOrEqual(sendTime, msg.outTS)
 	s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
 	s.Assert().Equal(msg.outText, msg.inText)
 
@@ -85,26 +87,8 @@ func (s *ConnectionSuite) TestConnectionConcurrency() {
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
 	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
-	wg := &sync.WaitGroup{}
-	wg.Add(workers)
+	s.testConnections(conn, workers, iterations)
 
-	clientTest := func(worker int) {
-		for i := 1; i <= iterations; i++ {
-			text := fmt.Sprintf("hello %d from worker %d", i, worker)
-			msg := &TestMessage{inText: text}
-			err := conn.Call(context.Background(), msg)
-			s.Assert().Nil(err)
-
-			s.Assert().LessOrEqual(time.Now().Add(-time.Minute), msg.outTS)
-			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
-			s.Assert().Equal(text, msg.outText)
-		}
-		wg.Done()
-	}
-	for i := 1; i <= workers; i++ {
-		go clientTest(i)
-	}
-	wg.Wait()
 	conn.Close()
 
 	<-th.Done()
@@ -122,26 +106,7 @@ func (s *ConnectionSuite) TestConnectionClose() {
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
 	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
-	wg := &sync.WaitGroup{}
-	wg.Add(workers)
-
-	clientTest := func(worker int) {
-		for i := 1; i <= iterations; i++ {
-			text := fmt.Sprintf("hello %d from worker %d", i, worker)
-			msg := &TestMessage{inText: text}
-			err := conn.Call(context.Background(), msg)
-			s.Assert().Nil(err)
-
-			s.Assert().LessOrEqual(time.Now().Add(-time.Minute), msg.outTS)
-			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
-			s.Assert().Equal(text, msg.outText)
-		}
-		wg.Done()
-	}
-	for i := 1; i <= workers; i++ {
-		go clientTest(i)
-	}
-	wg.Wait()
+	s.testConnections(conn, workers, iterations)
 
 	s.Require().Nil(l.Close())
 	// Wait until the server loops completes and closes the connection
@@ -165,4 +130,28 @@ func (s *ConnectionSuite) TestConnectionClose() {
 		s.Assert().ErrorIs(err, ErrConnClosed)
 	}
 	conn.Close()
+}
+
+func (s *ConnectionSuite) testConnections(conn *Connection, workers int, iterations int) {
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+
+	clientTest := func(worker int) {
+		for i := 1; i <= iterations; i++ {
+			text := fmt.Sprintf("hello %d from worker %d", i, worker)
+			msg := &TestMessage{inText: text}
+			startTime := time.Now()
+			err := conn.Call(context.Background(), msg)
+			s.Assert().Nil(err)
+
+			s.Assert().LessOrEqual(startTime, msg.outTS)
+			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
+			s.Assert().Equal(text, msg.outText)
+		}
+		wg.Done()
+	}
+	for i := 1; i <= workers; i++ {
+		go clientTest(i)
+	}
+	wg.Wait()
 }
