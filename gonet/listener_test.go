@@ -58,10 +58,10 @@ func (s *ListenerSuite) TestSingleConnection() {
 	l := s.setupListener(th)
 
 	conn, err := net.Dial("tcp", l.Address().String())
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	_, err = conn.Write([]byte("hello\n"))
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	h.isDoneReading.Wait()
 	s.Assert().Nil(h.readErr)
@@ -70,7 +70,7 @@ func (s *ListenerSuite) TestSingleConnection() {
 	h.isDoneWriting.Wait()
 	reader := bufio.NewReader(conn)
 	resText, err := reader.ReadString('\n')
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 	s.Assert().Equal("world\n", resText)
 	s.Assert().Nil(h.writeErr)
 
@@ -115,15 +115,15 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 
 	clientTest := func(worker int) {
 		conn, err := net.Dial("tcp", l.Address().String())
-		s.Require().Nil(err)
+		s.Require().NoError(err)
 
 		for i := 1; i <= iterations; i++ {
 			text := fmt.Sprintf("hello %d from worker %d\n", i, worker)
 			_, err = conn.Write([]byte(text))
-			s.Require().Nil(err)
+			s.Require().NoError(err)
 			reader := bufio.NewReader(conn)
 			resText, err := reader.ReadString('\n')
-			s.Require().Nil(err)
+			s.Require().NoError(err)
 			s.Assert().Equal("same to you: "+text, resText)
 		}
 

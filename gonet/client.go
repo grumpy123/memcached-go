@@ -2,8 +2,10 @@ package gonet
 
 import (
 	"context"
+	"math/rand"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,7 +14,7 @@ type Client struct {
 	minCons int
 	maxCons int
 
-	isOpen bool
+	isOpen atomic.Bool
 
 	slots chan *Connection
 
@@ -26,8 +28,6 @@ func NewClient(addr string, minCons, maxCons int) (*Client, error) {
 		minCons: minCons,
 		maxCons: maxCons,
 
-		isOpen: true,
-
 		slots: make(chan *Connection, maxCons),
 		conns: make([]*Connection, 0, maxCons),
 	}
@@ -35,6 +35,7 @@ func NewClient(addr string, minCons, maxCons int) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.isOpen.Store(true)
 	return c, nil
 }
 
@@ -89,12 +90,8 @@ func (c *Client) Call(ctx context.Context, msg Message) error {
 }
 
 func (c *Client) maybeGrow(initialWait time.Duration) {
-	if !c.isOpen {
+	if !c.isOpen.Load() {
 		return
-	}
-
-	if initialWait > 0 {
-		time.Sleep(initialWait)
 	}
 
 	if !c.connLock.TryLock() {
@@ -103,14 +100,22 @@ func (c *Client) maybeGrow(initialWait time.Duration) {
 	}
 	defer c.connLock.Unlock()
 
+	// Waiting while holding the lock, as we want to prevent other goroutines from spamming reconnections
+	if initialWait > 0 {
+		time.Sleep(initialWait)
+	}
+
+	if !c.isOpen.Load() {
+		return
+	}
+
 	// Remove all dead connections first
 	c.conns = slices.DeleteFunc(c.conns, func(conn *Connection) bool { return !conn.IsOpen() })
 
 	if len(c.conns) < c.maxCons {
 		conn, err := NewConnection(c.addr)
 		if err != nil {
-			// todo: real exponential backoff, randomized and with cap
-			go c.maybeGrow(time.Second + initialWait*3/2) // guaranteed to be growing
+			go c.maybeGrow(nextDelay(initialWait))
 			return
 		}
 		c.conns = append(c.conns, conn)
@@ -122,9 +127,14 @@ func (c *Client) Close() {
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
 
-	c.isOpen = false
+	c.isOpen.Store(false)
 	for _, conn := range c.conns {
 		conn.Close()
 	}
 	c.conns = nil
+}
+
+func nextDelay(delay time.Duration) time.Duration {
+	maxDelay := 5 * time.Second
+	return min(delay+10*time.Millisecond+time.Duration(rand.Float32()*float32(delay)), maxDelay)
 }

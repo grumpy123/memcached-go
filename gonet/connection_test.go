@@ -61,12 +61,12 @@ func (s *ConnectionSuite) TestConnection() {
 	l := s.setupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
-	sendTime := time.Now()
+	sendTime := s.nowUnixMicro()
 	msg := &TestMessage{inText: "hello world"}
 	err = conn.Call(context.Background(), msg)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	s.Assert().LessOrEqual(sendTime, msg.outTS)
 	s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
@@ -83,7 +83,7 @@ func (s *ConnectionSuite) TestConnectionConcurrency() {
 	l := s.setupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
 	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
@@ -102,7 +102,7 @@ func (s *ConnectionSuite) TestConnectionClose() {
 	l := s.setupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
 	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
@@ -140,11 +140,11 @@ func (s *ConnectionSuite) testConnections(conn *Connection, workers int, iterati
 		for i := 1; i <= iterations; i++ {
 			text := fmt.Sprintf("hello %d from worker %d", i, worker)
 			msg := &TestMessage{inText: text}
-			startTime := time.Now()
+			sendTime := s.nowUnixMicro()
 			err := conn.Call(context.Background(), msg)
-			s.Assert().Nil(err)
+			s.Assert().NoError(err)
 
-			s.Assert().LessOrEqual(startTime, msg.outTS)
+			s.Assert().LessOrEqual(sendTime, msg.outTS)
 			s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
 			s.Assert().Equal(text, msg.outText)
 		}

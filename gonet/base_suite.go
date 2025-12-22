@@ -2,9 +2,11 @@ package gonet
 
 import (
 	"context"
-	"github.com/stretchr/testify/suite"
 	"os"
 	"strconv"
+	"time"
+
+	"github.com/stretchr/testify/suite"
 )
 
 func must(f func() error) {
@@ -34,4 +36,8 @@ func (s *BaseSuite) intEnv(env string, defaultValue int) int {
 	i, err := strconv.Atoi(strValue)
 	s.Require().Nil(err)
 	return i
+}
+
+func (s *BaseSuite) nowUnixMicro() time.Time {
+	return time.Now().Truncate(time.Microsecond)
 }

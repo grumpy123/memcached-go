@@ -8,6 +8,10 @@ test:
 stress-test:
 	TEST_CONCURRENT_WORKERS=50 TEST_CONCURRENT_ITERATIONS=50 go test $(TEST_OPTS) --count=50 ./...
 
+.PHONY: stress-reconnect
+stress-recconect:
+	TEST_MAX_CONCURRENT_CONNECTIONS=50 TEST_CONCURRENT_WORKERS=250 TEST_CONCURRENT_ITERATIONS=100 go test --race --count 5 --run ClientSuite/TestClientWithErrors ./gonet
+
 .PHONY: fmt
 fmt:
 	# Fixup modules
