@@ -55,7 +55,7 @@ func (sc *SingleConnectionTestHandler) New(c net.Conn, done <-chan struct{}) {
 func (s *ListenerSuite) TestSingleConnection() {
 	h := NewSingleConnectionTestHandler()
 	th := WithTracking(h)
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := net.Dial("tcp", l.Address().String())
 	s.Require().NoError(err)
@@ -106,10 +106,10 @@ func (cc *ConcurrentConnectionsTestHandler) New(conn net.Conn, done <-chan struc
 func (s *ListenerSuite) TestConcurrentConnections() {
 	h := &ConcurrentConnectionsTestHandler{}
 	th := WithTracking(h)
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 10)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 10)
 	wg := &sync.WaitGroup{}
 	wg.Add(workers)
 

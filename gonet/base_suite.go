@@ -2,11 +2,7 @@ package gonet
 
 import (
 	"context"
-	"os"
-	"strconv"
-	"time"
-
-	"github.com/stretchr/testify/suite"
+	"memcached-go/testutil"
 )
 
 func must(f func() error) {
@@ -16,28 +12,13 @@ func must(f func() error) {
 }
 
 type BaseSuite struct {
-	suite.Suite
+	testutil.BaseSuite
 }
 
-func (s *BaseSuite) setupListener(h ConnectionHandler) *Listener {
+func (s *BaseSuite) SetupListener(h ConnectionHandler) *Listener {
 	l := NewListener(0, h)
 	err := l.Start(context.Background())
 	s.Require().NoError(err)
 
 	return l
-}
-
-func (s *BaseSuite) intEnv(env string, defaultValue int) int {
-	strValue := os.Getenv(env)
-	if strValue == "" {
-		return defaultValue
-	}
-
-	i, err := strconv.Atoi(strValue)
-	s.Require().NoError(err)
-	return i
-}
-
-func (s *BaseSuite) nowUnixMicro() time.Time {
-	return time.Now().Truncate(time.Microsecond)
 }

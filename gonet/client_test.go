@@ -22,12 +22,12 @@ func (s *ClientSuite) TestClient() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	cli, err := NewClient(l.Address().String(), 1, 1)
 	s.Require().NoError(err)
 
-	sendTime := s.nowUnixMicro()
+	sendTime := s.NowUnixMicro()
 	msg := &TestMessage{inText: "hello world"}
 	err = cli.Call(context.Background(), msg)
 	s.Require().NoError(err)
@@ -44,13 +44,13 @@ func (s *ClientSuite) TestClientConcurrency() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	cli, err := NewClient(l.Address().String(), 3, 10)
 	s.Require().NoError(err)
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 10)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 5)
 	s.testClients(cli, workers, iterations)
 
 	cli.Close()
@@ -63,16 +63,16 @@ func (s *ClientSuite) TestClientWithErrors() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
-	maxConns := s.intEnv("TEST_MAX_CONCURRENT_CONNECTIONS", 10)
+	maxConns := s.IntEnv("TEST_MAX_CONCURRENT_CONNECTIONS", 10)
 	cli, err := NewClient(l.Address().String(), 3, maxConns)
 	s.Require().NoError(err)
 
 	s.Equal(3, numConnections(cli))
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 10)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 5)
 
 	s.testClients(cli, workers, iterations)
 
@@ -91,7 +91,7 @@ func (s *ClientSuite) TestClientMaxConnections() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	cli, err := NewClient(l.Address().String(), 0, 3)
 	s.Require().NoError(err)
@@ -116,13 +116,13 @@ func (s *ClientSuite) TestClientMaxConnections() {
 //	h := &TestRequestHandler{}
 //	th := WithTracking(NewServerFactory(h))
 //
-//	l := s.setupListener(th)
+//	l := s.SetupListener(th)
 //
 //	cli, err := NewClient(l.Address().String(), 1, 5)
 //	s.Require().NoError(err)
 //
-//	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
-//	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
+//	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 5)
+//	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 2)
 //	s.testClients(cli, workers, iterations)
 //
 //	s.Require().NoError(l.Close())
@@ -142,7 +142,7 @@ func (s *ClientSuite) testClients(cli *Client, workers int, iterations int) {
 		for i := 1; i <= iterations; i++ {
 			text := fmt.Sprintf("hello %d from worker %d", i, worker)
 			msg := &TestMessage{inText: text}
-			sendTime := s.nowUnixMicro()
+			sendTime := s.NowUnixMicro()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err := cli.Call(ctx, msg)

@@ -26,3 +26,10 @@ lint:
 
 .PHONY: pr
 pr: stress-test lint fmt
+
+.PHONY: test-mmc
+test-mmc:
+	docker stop memcached || true
+	docker rm memcached || true
+	docker run -p 11211:11211 --name memcached --detach memcached:alpine
+	go test $(TEST_OPTS) ./mmc/...

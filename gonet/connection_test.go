@@ -58,12 +58,12 @@ func (s *ConnectionSuite) TestConnection() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
 	s.Require().NoError(err)
 
-	sendTime := s.nowUnixMicro()
+	sendTime := s.NowUnixMicro()
 	msg := &TestMessage{inText: "hello world"}
 	err = conn.Call(context.Background(), msg)
 	s.Require().NoError(err)
@@ -80,13 +80,13 @@ func (s *ConnectionSuite) TestConnectionConcurrency() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
 	s.Require().NoError(err)
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 10)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 5)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 10)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 5)
 	s.testConnections(conn, workers, iterations)
 
 	conn.Close()
@@ -99,13 +99,13 @@ func (s *ConnectionSuite) TestConnectionClose() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := NewConnection(l.Address().String())
 	s.Require().NoError(err)
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 2)
 	s.testConnections(conn, workers, iterations)
 
 	s.Require().NoError(l.Close())
@@ -140,7 +140,7 @@ func (s *ConnectionSuite) testConnections(conn *Connection, workers int, iterati
 		for i := 1; i <= iterations; i++ {
 			text := fmt.Sprintf("hello %d from worker %d", i, worker)
 			msg := &TestMessage{inText: text}
-			sendTime := s.nowUnixMicro()
+			sendTime := s.NowUnixMicro()
 			err := conn.Call(context.Background(), msg)
 			s.Assert().NoError(err)
 

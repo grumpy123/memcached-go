@@ -57,7 +57,7 @@ func (s *ServerSuite) TestServer() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := net.Dial("tcp", l.Address().String())
 	s.Require().NoError(err)
@@ -75,7 +75,7 @@ func (s *ServerSuite) TestServerWithErrors() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
 
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
 	conn, err := net.Dial("tcp", l.Address().String())
 	s.Require().NoError(err)
@@ -106,10 +106,10 @@ func (s *ServerSuite) TestServerWithErrors() {
 func (s *ServerSuite) TestServerConcurrency() {
 	h := &TestRequestHandler{}
 	th := WithTracking(NewServerFactory(h))
-	l := s.setupListener(th)
+	l := s.SetupListener(th)
 
-	workers := s.intEnv("TEST_CONCURRENT_WORKERS", 5)
-	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 10)
+	workers := s.IntEnv("TEST_CONCURRENT_WORKERS", 5)
+	iterations := s.IntEnv("TEST_CONCURRENT_ITERATIONS", 10)
 	wg := &sync.WaitGroup{}
 	wg.Add(workers)
 
@@ -136,7 +136,7 @@ func (s *ServerSuite) TestServerConcurrency() {
 }
 
 func (s *ServerSuite) testMessage(conn net.Conn, reader *bufio.Reader, text string) {
-	sendTime := s.nowUnixMicro()
+	sendTime := s.NowUnixMicro()
 	_, err := conn.Write([]byte(text))
 	s.Require().NoError(err)
 
