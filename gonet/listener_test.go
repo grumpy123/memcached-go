@@ -77,7 +77,7 @@ func (s *ListenerSuite) TestSingleConnection() {
 	s.Require().NoError(conn.Close())
 	s.Require().NoError(l.Close())
 
-	<-th.Done()
+	th.Wait()
 }
 
 type ConcurrentConnectionsTestHandler struct{}
@@ -136,7 +136,7 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 
 	wg.Wait()
 	s.Require().NoError(l.Close())
-	<-th.Done()
+	th.Wait()
 }
 
 // todo: test reading from socket doesn't block accepting (parallel connections, may need to wait with N semaphore)

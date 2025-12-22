@@ -68,7 +68,7 @@ func (s *ServerSuite) TestServer() {
 
 	s.Require().NoError(l.Close())
 	s.Require().NoError(conn.Close())
-	<-th.Done()
+	th.Wait()
 }
 
 func (s *ServerSuite) TestServerWithErrors() {
@@ -101,7 +101,7 @@ func (s *ServerSuite) TestServerWithErrors() {
 
 	s.Require().NoError(l.Close())
 	s.Require().NoError(conn.Close())
-	<-th.Done()
+	th.Wait()
 }
 func (s *ServerSuite) TestServerConcurrency() {
 	h := &TestRequestHandler{}
@@ -132,7 +132,7 @@ func (s *ServerSuite) TestServerConcurrency() {
 
 	wg.Wait()
 	s.Require().NoError(l.Close())
-	<-th.Done()
+	th.Wait()
 }
 
 func (s *ServerSuite) testMessage(conn net.Conn, reader *bufio.Reader, text string) {

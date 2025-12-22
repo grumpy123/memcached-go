@@ -49,6 +49,10 @@ func (s *Set) WriteRequest(w *bufio.Writer) error {
 	}
 
 	_, err = w.Write(newLine)
+	if err != nil {
+		return err
+	}
+
 	err = w.Flush()
 	if err != nil {
 		return err
@@ -58,13 +62,19 @@ func (s *Set) WriteRequest(w *bufio.Writer) error {
 }
 
 func (s *Set) ReadResponse(r *bufio.Reader) error {
-	resp, err := r.ReadSlice('\n')
+	header, err := respHeader(r)
 	if err != nil {
 		return err
 	}
-	resp = dropTrailingNewLine(resp)
-	if !bytes.Equal(resp, stored) {
-		return fmt.Errorf("expected stored, but got %q: %w", string(resp), ErrBadResponse)
+
+	err = maybeError(header)
+	if err != nil {
+		s.Error = err
+		return nil
+	}
+
+	if !bytes.Equal(header[0], stored) {
+		return fmt.Errorf("expected stored, but got %q: %w", string(header[0]), ErrBadResponse)
 	}
 	return nil
 }

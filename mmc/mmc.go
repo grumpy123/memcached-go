@@ -13,8 +13,9 @@ var (
 	newLine = []byte("\r\n")
 	space   = []byte(" ")
 
-	end = []byte("END")
-	en  = []byte("EN")
+	end        = []byte("END")
+	en         = []byte("EN")
+	endOfValue = []byte("\r\nEND\r\n")
 
 	value  = []byte("VALUE")
 	stored = []byte("STORED")
@@ -25,7 +26,7 @@ var (
 
 	ErrClientError = errors.New("memcached client error")
 	ErrServerError = errors.New("memcached server error")
-	ErrUnknownCmd  = errors.New("unknown memcached command")
+	ErrGenError    = errors.New("memcached error")
 	ErrBadResponse = errors.New("bad memcached response")
 
 	ErrMiss = errors.New("miss")
@@ -70,7 +71,7 @@ func maybeServerError(header [][]byte) error {
 }
 
 func maybeGenError(header [][]byte) error {
-	return parseErrorX(header, genError, ErrUnknownCmd)
+	return parseErrorX(header, genError, ErrGenError)
 }
 
 func parseErrorX(header [][]byte, errorX []byte, err error) error {
@@ -99,7 +100,7 @@ func readValue(r *bufio.Reader, header [][]byte, key []byte) (uint16, []byte, er
 		return 0, nil, fmt.Errorf("expected 3 more parts after value, got %q: %w", string(header[1]), ErrBadResponse)
 	}
 	if !bytes.Equal(params[0], key) {
-		return 0, nil, fmt.Errorf("incorrect key: %w", ErrBadResponse)
+		return 0, nil, fmt.Errorf("incorrect key %q, requested %q: %w", string(params[0]), string(key), ErrBadResponse)
 	}
 	flags, err := strconv.ParseUint(string(params[1]), 10, 16)
 	if err != nil {
@@ -114,9 +115,14 @@ func readValue(r *bufio.Reader, header [][]byte, key []byte) (uint16, []byte, er
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to read value: %w", ErrBadResponse)
 	}
-	_, err = r.ReadSlice('\n')
+
+	ending := make([]byte, len(endOfValue))
+	_, err = io.ReadFull(r, ending)
 	if err != nil {
-		return 0, nil, fmt.Errorf("after value expected \\r\\n: %w", ErrBadResponse)
+		return 0, nil, fmt.Errorf("after value expected \\r\\nEND\\r\\n: %w", ErrBadResponse)
+	}
+	if !bytes.Equal(ending, endOfValue) {
+		return 0, nil, fmt.Errorf("after value expected \\r\\nEND\\r\\n, got %q: %w", string(ending), ErrBadResponse)
 	}
 	return uint16(flags), val, nil
 }

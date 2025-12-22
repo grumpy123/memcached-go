@@ -65,7 +65,7 @@ func (s *MmcSuite) TestMmc() {
 	errMsg := unknownCmdErrorMsg()
 	err = cli.Call(context.Background(), errMsg)
 	s.Require().NoError(err)
-	s.ErrorIs(errMsg.err, ErrUnknownCmd)
+	s.ErrorIs(errMsg.err, ErrGenError)
 
 	errMsg = clientErrorMsg()
 	err = cli.Call(context.Background(), errMsg)

@@ -73,7 +73,7 @@ func (s *ConnectionSuite) TestConnection() {
 	s.Assert().Equal(msg.outText, msg.inText)
 
 	s.Require().NoError(l.Close())
-	<-th.Done()
+	th.Wait()
 }
 
 func (s *ConnectionSuite) TestConnectionConcurrency() {
@@ -91,7 +91,7 @@ func (s *ConnectionSuite) TestConnectionConcurrency() {
 
 	conn.Close()
 
-	<-th.Done()
+	th.Wait()
 	s.Require().NoError(l.Close())
 }
 
@@ -110,7 +110,7 @@ func (s *ConnectionSuite) TestConnectionClose() {
 
 	s.Require().NoError(l.Close())
 	// Wait until the server loops completes and closes the connection
-	<-th.Done()
+	th.Wait()
 
 	// todo: switch to Send when it's implemented
 	err = conn.Call(context.Background(), &TestMessage{inText: "Expected to fail gracefully"})
