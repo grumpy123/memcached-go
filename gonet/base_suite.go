@@ -22,7 +22,7 @@ type BaseSuite struct {
 func (s *BaseSuite) setupListener(h ConnectionHandler) *Listener {
 	l := NewListener(0, h)
 	err := l.Start(context.Background())
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 
 	return l
 }
@@ -34,7 +34,7 @@ func (s *BaseSuite) intEnv(env string, defaultValue int) int {
 	}
 
 	i, err := strconv.Atoi(strValue)
-	s.Require().Nil(err)
+	s.Require().NoError(err)
 	return i
 }
 

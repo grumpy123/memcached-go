@@ -8,17 +8,6 @@ import (
 	"sync/atomic"
 )
 
-type Message interface {
-	WriteRequest(w *bufio.Writer) error
-	ReadResponse(r *bufio.Reader) error
-}
-
-type PendingMessage struct {
-	msg       Message
-	err       error
-	completed chan struct{}
-}
-
 type Connection struct {
 	conn   net.Conn
 	isOpen atomic.Bool

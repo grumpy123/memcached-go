@@ -64,7 +64,7 @@ func (s *ListenerSuite) TestSingleConnection() {
 	s.Require().NoError(err)
 
 	h.isDoneReading.Wait()
-	s.Assert().Nil(h.readErr)
+	s.Assert().NoError(h.readErr)
 	s.Assert().Equal("hello\n", h.text)
 
 	h.isDoneWriting.Wait()
@@ -72,10 +72,10 @@ func (s *ListenerSuite) TestSingleConnection() {
 	resText, err := reader.ReadString('\n')
 	s.Require().NoError(err)
 	s.Assert().Equal("world\n", resText)
-	s.Assert().Nil(h.writeErr)
+	s.Assert().NoError(h.writeErr)
 
-	s.Require().Nil(conn.Close())
-	s.Require().Nil(l.Close())
+	s.Require().NoError(conn.Close())
+	s.Require().NoError(l.Close())
 
 	<-th.Done()
 }
@@ -127,7 +127,7 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 			s.Assert().Equal("same to you: "+text, resText)
 		}
 
-		s.Require().Nil(conn.Close())
+		s.Require().NoError(conn.Close())
 		wg.Done()
 	}
 	for i := 1; i <= workers; i++ {
@@ -135,7 +135,7 @@ func (s *ListenerSuite) TestConcurrentConnections() {
 	}
 
 	wg.Wait()
-	s.Require().Nil(l.Close())
+	s.Require().NoError(l.Close())
 	<-th.Done()
 }
 

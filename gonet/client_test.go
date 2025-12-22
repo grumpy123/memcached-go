@@ -36,7 +36,7 @@ func (s *ClientSuite) TestClient() {
 	s.Assert().GreaterOrEqual(time.Now(), msg.outTS)
 	s.Assert().Equal(msg.outText, msg.inText)
 
-	s.Require().Nil(l.Close())
+	s.Require().NoError(l.Close())
 	<-th.Done()
 }
 
@@ -56,7 +56,7 @@ func (s *ClientSuite) TestClientConcurrency() {
 	cli.Close()
 
 	<-th.Done()
-	s.Require().Nil(l.Close())
+	s.Require().NoError(l.Close())
 }
 
 func (s *ClientSuite) TestClientWithErrors() {
@@ -84,7 +84,7 @@ func (s *ClientSuite) TestClientWithErrors() {
 	cli.Close()
 
 	<-th.Done()
-	s.Require().Nil(l.Close())
+	s.Require().NoError(l.Close())
 }
 
 func (s *ClientSuite) TestClientMaxConnections() {
@@ -125,7 +125,7 @@ func (s *ClientSuite) TestClientMaxConnections() {
 //	iterations := s.intEnv("TEST_CONCURRENT_ITERATIONS", 2)
 //	s.testClients(cli, workers, iterations)
 //
-//	s.Require().Nil(l.Close())
+//	s.Require().NoError(l.Close())
 //	// Wait until the server loops completes and closes the connection
 //	<-th.Done()
 //

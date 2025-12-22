@@ -14,6 +14,7 @@ type RequestHandler interface {
 	ReadRequest(reader *bufio.Reader) (Request, error)
 }
 
+// Server is a simple server, meant to help with writing tests for the client side. Don't try using in production :)
 type Server struct {
 	handler RequestHandler
 	conn    net.Conn
