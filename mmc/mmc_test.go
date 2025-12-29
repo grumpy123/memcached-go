@@ -7,6 +7,7 @@ import (
 	"memcached-go/gonet"
 	"memcached-go/testutil"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -77,7 +78,7 @@ func (s *MmcSuite) TestMmc() {
 	s.Require().NoError(err)
 	s.ErrorIs(getMsg.Error, ErrMiss)
 
-	setMsg := NewSet("bar", 5, []byte("baz"))
+	setMsg := NewSet("bar", 5, []byte("baz"), time.Minute)
 	err = cli.Call(context.Background(), setMsg)
 	s.Require().NoError(err)
 	s.NoError(setMsg.Error)

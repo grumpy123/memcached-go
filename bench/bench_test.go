@@ -6,6 +6,7 @@ import (
 	memcached_go "memcached-go"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func BenchmarkClient(b *testing.B) {
 	for i := 1; i <= iterations; i++ {
 		key := fmt.Sprintf("bench-%d", i)
 		val := []byte(fmt.Sprintf("value-%d-blahblahblah", i))
-		err = cli.Set(context.Background(), key, val)
+		err = cli.Set(context.Background(), key, 0, val, time.Hour)
 		require.NoError(b, err)
 	}
 
@@ -36,7 +37,7 @@ func BenchmarkClient(b *testing.B) {
 		defer wg.Done()
 		for i := 1; i <= iterations; i++ {
 			key := fmt.Sprintf("bench-%d", i)
-			_, err = cli.Get(context.Background(), key)
+			_, _, err = cli.Get(context.Background(), key)
 		}
 	}
 

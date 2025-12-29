@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+	expFlags = uint16(77)
+)
+
 type ClientSuite struct {
 	testutil.BaseSuite
 }
@@ -36,7 +40,7 @@ func (s *ClientSuite) TestClientConcurrency() {
 	for i := 1; i <= iterations; i++ {
 		key := fmt.Sprintf("test-%d", i)
 		val := []byte(fmt.Sprintf("value-%d-blahblahblah", i))
-		err = cli.Set(context.Background(), key, val)
+		err = cli.Set(context.Background(), key, expFlags, val, time.Hour)
 		s.Require().NoError(err)
 	}
 
@@ -64,24 +68,27 @@ func (s *ClientSuite) testIteration(cli *Client, worker, i int) {
 	key := fmt.Sprintf("test-%d", i)
 	val := []byte(fmt.Sprintf("value-%d-blahblahblah", i))
 
-	got, err := cli.Get(ctx, key)
-	s.Assert().NoError(err)
-	s.Assert().Equal(val, got)
+	got, flags, err := cli.Get(ctx, key)
+	s.NoError(err)
+	s.Equal(val, got)
+	s.Equal(expFlags, flags)
 
 	keyMiss := fmt.Sprintf("miss-%d", i)
-	got, err = cli.Get(ctx, keyMiss)
-	s.Assert().NoError(err)
-	s.Assert().Nil(got)
+	got, flags, err = cli.Get(ctx, keyMiss)
+	s.NoError(err)
+	s.Nil(got)
+	s.Equal(uint16(0), flags)
 
 	key = fmt.Sprintf("test-%d-worker-%d", i, worker)
 	val = []byte(fmt.Sprintf("value-%d-blahblahblah-worker-%d", i, worker))
 
-	err = cli.Set(ctx, key, val)
-	s.Assert().NoError(err)
+	err = cli.Set(ctx, key, 99, val, time.Hour)
+	s.NoError(err)
 
-	got, err = cli.Get(ctx, key)
-	s.Assert().NoError(err)
-	s.Assert().Equal(val, got)
+	got, flags, err = cli.Get(ctx, key)
+	s.NoError(err)
+	s.Equal(val, got)
+	s.Equal(uint16(99), flags)
 }
 
 func (s *ClientSuite) testTimeout(cli *Client, i int) {
@@ -90,14 +97,16 @@ func (s *ClientSuite) testTimeout(cli *Client, i int) {
 
 	key := fmt.Sprintf("test-%d", i)
 	val := []byte(fmt.Sprintf("value-%d-blahblahblah", i))
+
 	for {
-		got, err := cli.Get(ctx, key)
+		got, flags, err := cli.Get(ctx, key)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			// Timeout is sometimes allowed
 			return
 		}
 
-		s.Assert().NoError(err)
-		s.Assert().Equal(val, got)
+		s.Require().NoError(err)
+		s.Equal(val, got)
+		s.Equal(expFlags, flags)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"memcached-go/gonet"
 	"memcached-go/mmc"
+	"time"
 )
 
 type Client struct {
@@ -23,20 +24,20 @@ func (c *Client) Close() {
 	c.cli.Close()
 }
 
-func (c *Client) Get(ctx context.Context, key string) ([]byte, error) {
+func (c *Client) Get(ctx context.Context, key string) ([]byte, uint16, error) {
 	getMsg := mmc.NewGet(key)
 	err := c.cli.Call(ctx, getMsg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if getMsg.Error != nil && errors.Is(getMsg.Error, mmc.ErrMiss) {
-		return nil, nil
+		return nil, 0, nil
 	}
-	return getMsg.Value, nil
+	return getMsg.Value, getMsg.Flags, nil
 }
 
-func (c *Client) Set(ctx context.Context, key string, val []byte) error {
-	setMsg := mmc.NewSet(key, 0, val)
+func (c *Client) Set(ctx context.Context, key string, flags uint16, val []byte, ttl time.Duration) error {
+	setMsg := mmc.NewSet(key, flags, val, ttl)
 	err := c.cli.Call(ctx, setMsg)
 	if err != nil {
 		return err

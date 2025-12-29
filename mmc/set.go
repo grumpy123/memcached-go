@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"time"
 )
 
 var (
@@ -12,17 +13,18 @@ var (
 
 type Set struct {
 	// Request
-	Key   []byte
-	Flags uint16
-	Value []byte
+	Key     []byte
+	Flags   uint16
+	Value   []byte
+	Exptime int32
 
 	// Response
 	Error error
 }
 
-func NewSet(key string, flags uint16, value []byte) *Set {
+func NewSet(key string, flags uint16, value []byte, ttl time.Duration) *Set {
 	// todo: validate key
-	return &Set{Key: []byte(key), Flags: flags, Value: value}
+	return &Set{Key: []byte(key), Flags: flags, Value: value, Exptime: ttlToExptime(ttl)}
 }
 
 func (s *Set) WriteRequest(w *bufio.Writer) error {
