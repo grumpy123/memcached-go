@@ -36,6 +36,11 @@ func (c *Client) Get(ctx context.Context, key string) ([]byte, uint16, error) {
 	return getMsg.Value, getMsg.Flags, nil
 }
 
+func (c *Client) GetV(ctx context.Context, key string) ([]byte, error) {
+	val, _, err := c.Get(ctx, key)
+	return val, err
+}
+
 func (c *Client) Set(ctx context.Context, key string, flags uint16, val []byte, ttl time.Duration) error {
 	setMsg := mmc.NewSet(key, flags, val, ttl)
 	err := c.cli.Call(ctx, setMsg)
@@ -46,4 +51,8 @@ func (c *Client) Set(ctx context.Context, key string, flags uint16, val []byte, 
 		return setMsg.Error
 	}
 	return nil
+}
+
+func (c *Client) SetV(ctx context.Context, key string, val []byte) error {
+	return c.Set(ctx, key, 0, val, 0)
 }
