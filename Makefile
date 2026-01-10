@@ -44,3 +44,7 @@ stress-mmc: start-mmc
 
 .PHONY: test-all
 test-all: test stress-test stress-reconnect test-mmc stress-mmc
+
+.PHONY: bench-mmc
+bench: start-mmc
+	go test --bench=^Benchmark --benchtime=5s ./bench/...
